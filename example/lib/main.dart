@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'dart:async';
 
 import 'package:flutter/services.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:vcrtc_plugin/vcrtc_plugin.dart';
 
 import 'meeting.dart';
@@ -10,23 +11,41 @@ void main() {
   runApp(MyApp());
 }
 
-class MyApp extends StatefulWidget {
+class MyApp extends StatelessWidget {
+  const MyApp({Key key}) : super(key: key);
+
   @override
-  _MyAppState createState() => _MyAppState();
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      routes: {
+        '/view': (context) => Meeting(),
+      },
+      home: Home(),
+    );
+  }
 }
 
-class _MyAppState extends State<MyApp> {
+class Home extends StatefulWidget {
+  Home({Key key}) : super(key: key);
+
+  @override
+  _HomeState createState() => _HomeState();
+}
+
+class _HomeState extends State<Home> {
   String _platformVersion = 'Unknown';
 
   @override
   void initState() {
     super.initState();
+    SystemUiOverlayStyle systemUiOverlayStyle =
+        SystemUiOverlayStyle(statusBarColor: Colors.transparent);
+    SystemChrome.setSystemUIOverlayStyle(systemUiOverlayStyle);
     initPlatformState();
     login();
     setServerAddress();
   }
 
-  // Platform messages are asynchronous, so we initialize in an async method.
   Future<void> initPlatformState() async {
     String platformVersion;
     // Platform messages may fail, so we use a try/catch PlatformException.
@@ -59,28 +78,29 @@ class _MyAppState extends State<MyApp> {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      routes: {
-        '/view': (context) => Meeting(),
-      },
-      home: Scaffold(
-        appBar: AppBar(
-          title: const Text('Plugin example app'),
-        ),
-        body: Column(
-          children: [
-            Text('Running on: $_platformVersion\n'),
-            RaisedButton(
-              child: Text('go meeting view'),
-              onPressed: () => Navigator.pushNamed(context, '/view'),
-            ),
-            RaisedButton(
-              child: Text('go meeting view'),
-              onPressed: () => Navigator.pushNamed(context, '/view'),
-            ),
-          ],
-        ),
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Plugin example app'),
+      ),
+      body: Column(
+        children: [
+          Text('Running on: $_platformVersion\n'),
+          RaisedButton(
+            child: Text('go meeting view'),
+            onPressed: enterMeeting,
+          ),
+        ],
       ),
     );
+  }
+
+  void enterMeeting() async {
+    if (await Permission.camera.request().isGranted &&
+        await Permission.microphone.request().isGranted) {
+      VcrtcPlugin.connect();
+      Navigator.pushNamed(context, "/view");
+    } else {
+      print("需要获取音视频权限才能进入");
+    }
   }
 }

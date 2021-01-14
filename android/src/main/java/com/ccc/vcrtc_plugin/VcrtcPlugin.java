@@ -8,12 +8,19 @@ import android.util.Log;
 
 import androidx.annotation.NonNull;
 
+import com.ccc.vcrtc_plugin.bean.Stream;
+import com.ccc.vcrtc_plugin.listener.MeetingViewListener;
+import com.ccc.vcrtc_plugin.platform.MeetingViewListenerCallBack;
+import com.ccc.vcrtc_plugin.platform.MeetingFactory;
+import com.ccc.vcrtc_plugin.platform.MeetingView;
+import com.ccc.vcrtc_plugin.platform.MeetingViewCallBack;
+import com.ccc.vcrtc_plugin.platform.ViewCollect;
 import com.ccc.vcrtc_plugin.receivers.LoginReceiver;
 import com.ccc.vcrtc_plugin.utils.Param;
 import com.vcrtc.VCRTC;
 import com.vcrtc.VCRTCPreferences;
+import com.vcrtc.VCRTCView;
 import com.vcrtc.callbacks.CallBack;
-import com.vcrtc.entities.Call;
 import com.vcrtc.listeners.VCRTCListener;
 import com.vcrtc.registration.VCRegistrationUtil;
 import com.vcrtc.webrtc.RTCManager;
@@ -22,15 +29,19 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 
 import io.flutter.embedding.engine.plugins.FlutterPlugin;
+import io.flutter.plugin.common.BinaryMessenger;
 import io.flutter.plugin.common.MethodCall;
 import io.flutter.plugin.common.MethodChannel;
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler;
 import io.flutter.plugin.common.MethodChannel.Result;
+import io.flutter.plugin.platform.PlatformViewRegistry;
 
 import static com.vcrtc.registration.VCService.VC_ACTION;
 
 /** VcrtcPlugin */
 public class VcrtcPlugin implements FlutterPlugin, MethodCallHandler {
+
+  final static public Handler mainHandler = new Handler(Looper.getMainLooper());
   private static final String TAG = "VcrtcPlugin";
   private MethodChannel channel;
   private Context context;
@@ -38,14 +49,19 @@ public class VcrtcPlugin implements FlutterPlugin, MethodCallHandler {
   private VCRTCPreferences vcrtcPreferences;
   private VCRTC vcrtc;
   VCRTCListener listener;
+  PlatformViewRegistry registry;
+  BinaryMessenger messenger;
+  MeetingFactory meetingFactory;
+  ViewCollect viewCollect;
 
   public VcrtcPlugin(){}
 
-  private VcrtcPlugin(final Context context, MethodChannel channel){
+  private VcrtcPlugin(BinaryMessenger messenger, Context context, MethodChannel channel, PlatformViewRegistry registry){
     this.channel = channel;
     this.context = context;
+    this.registry = registry;
+    this.messenger = messenger;
     vcrtcPreferences = new VCRTCPreferences(context);
-    listener = new Listener();
     RTCManager.init(context);
     RTCManager.DEVICE_TYPE = "Android";
     RTCManager.OEM = "";
@@ -57,7 +73,7 @@ public class VcrtcPlugin implements FlutterPlugin, MethodCallHandler {
   @Override
   public void onAttachedToEngine(@NonNull FlutterPluginBinding flutterPluginBinding) {
     final MethodChannel channel = new MethodChannel(flutterPluginBinding.getBinaryMessenger(), "vcrtc_plugin");
-    channel.setMethodCallHandler(new VcrtcPlugin(flutterPluginBinding.getApplicationContext(),channel));
+    channel.setMethodCallHandler(new VcrtcPlugin(flutterPluginBinding.getBinaryMessenger(),flutterPluginBinding.getApplicationContext(),channel,flutterPluginBinding.getPlatformViewRegistry()));
   }
 
 
@@ -76,20 +92,85 @@ public class VcrtcPlugin implements FlutterPlugin, MethodCallHandler {
     }
   }
 
-  private void makeCall(){
+  private void connect(MethodCall call, final Result result){
     vcrtc = new VCRTC(context);
-    vcrtc.setVCRTCListener(listener);
-    vcrtc.connect("8080199","","test", new CallBack() {
+    viewCollect = ViewCollect.getInstance();
+    meetingFactory = new MeetingFactory(context, messenger, new MeetingViewCallBack() {
       @Override
-      public void success(String s) {
-
+      public void onLocalViewCreated(int viewId,MeetingView view) {
+      }
+      @Override
+      public void onRemoteViewCreated(int viewId,MeetingView view) {
+      }
+    }, new MeetingViewListenerCallBack() {
+      @Override
+      public void onLocalVideo(String uuid, VCRTCView view) {
+        viewCollect.setView(uuid,view);
       }
 
       @Override
-      public void failure(String s) {
+      public void onRemoteVideo(String uuid, VCRTCView view) {
+        //viewCollect.setView(uuid,view);
+      }
 
+      @Override
+      public void onAddView(String uuid, VCRTCView view, String viewType) {
+        viewCollect.setView(uuid,view);
+      }
+
+      @Override
+      public void onRemoteStream(String uuid, String streamUrl, String streamType) {
+        Stream stream = viewCollect.getStream(uuid);
+        if(stream == null){
+          stream = new Stream();
+        }
+        stream.setStream(streamType,streamUrl);
+        viewCollect.setStream(uuid,stream);
+      }
+
+      @Override
+      public void onLocalStream(String uuid, String streamUrl, String streamType) {
+        Stream stream = viewCollect.getStream(uuid);
+        if(stream == null){
+          stream = new Stream();
+        }
+        stream.setStream(streamType,streamUrl);
+        viewCollect.setStream(uuid,stream);
+      }
+
+      @Override
+      public void onRemoveView(String uuid, VCRTCView vcrtcView) {
+        viewCollect.removeView(uuid);
       }
     });
+    listener = new MeetingViewListener(meetingFactory,channel);
+    vcrtc.setVCRTCListener(listener);
+    vcrtc.connect("8089199","","test", new CallBack() {
+      @Override
+      public void success(String s) {
+        mainHandler.post(new Runnable() {
+          @Override
+          public void run() {
+            result.success(null);
+          }
+        });
+      }
+
+      @Override
+      public void failure(final String s) {
+        mainHandler.post(new Runnable() {
+          @Override
+          public void run() {
+            result.error("1001","失败",s);
+          }
+        });
+      }
+    });
+    registry.registerViewFactory(MeetingFactory.SIGN,meetingFactory);
+  }
+
+  private void disconnect(MethodCall call, Result result){
+    vcrtc.disconnect();
   }
 
   private void getPlatformVersion(MethodCall call, Result result){

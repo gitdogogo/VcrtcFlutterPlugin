@@ -7,6 +7,7 @@ import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
 
+import com.ccc.vcrtc_plugin.VcrtcPlugin;
 import com.vcrtc.registration.VCService;
 
 
@@ -15,14 +16,13 @@ import io.flutter.plugin.common.MethodChannel;
 public class LoginReceiver extends BroadcastReceiver {
     private MethodChannel.Result result;
     private String TAG = "LoginReceiver";
-    Handler handler = new Handler(Looper.getMainLooper());
     @Override
     public void onReceive(Context context, Intent intent) {
         String message = intent.getStringExtra(VCService.MSG);
         Log.i(TAG,message);
         switch (message) {
             case VCService.MSG_LOGIN_SUCCESS:
-                handler.post(new Runnable() {
+                VcrtcPlugin.mainHandler.post(new Runnable() {
                     @Override
                     public void run() {
                         result.success("登录成功");
@@ -30,7 +30,7 @@ public class LoginReceiver extends BroadcastReceiver {
                 });
                 break;
             case VCService.MSG_LOGIN_FAILED:
-                handler.post(new Runnable() {
+                VcrtcPlugin.mainHandler.post(new Runnable() {
                     @Override
                     public void run() {
                         result.success("登录失败");
@@ -40,7 +40,7 @@ public class LoginReceiver extends BroadcastReceiver {
             case VCService.MSG_USER_INFO:
                 //用户信息
                 final String userJson = intent.getStringExtra(VCService.DATA_BROADCAST);
-                handler.post(new Runnable() {
+                VcrtcPlugin.mainHandler.post(new Runnable() {
                     @Override
                     public void run() {
                         result.success(userJson);
