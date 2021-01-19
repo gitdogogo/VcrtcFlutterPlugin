@@ -13,6 +13,8 @@ A new flutter plugin project.
   s.license          = { :file => '../LICENSE' }
   s.author           = { 'Your Company' => 'email@example.com' }
   s.source           = { :path => '.' }
+  s.ios.vendored_frameworks = 'Frameworks/VCRTC.framework','Frameworks/WebRTC.framework'
+  s.vendored_frameworks = 'VCRTC.framework','WebRTC.framework'
   s.source_files = 'Classes/**/*'
   s.dependency 'Flutter'
   s.platform = :ios, '8.0'
