@@ -64,7 +64,7 @@ public class SwiftVcrtcPlugin: NSObject, FlutterPlugin{
         let server = Param.get(call: call,result: result,param: "serverAddress") as! String
         let port = Param.get(call: call,result: result,param: "httpsPort") as! String
         vcrtc.apiServer = server
-        vcrtc.https_port = portå
+        vcrtc.https_port = port
     }
     public func login(_ call: FlutterMethodCall, result: @escaping FlutterResult){
         
